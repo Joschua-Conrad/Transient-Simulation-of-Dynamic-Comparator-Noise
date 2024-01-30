@@ -1,0 +1,590 @@
+// VerilogA for CNN_Accelerator, va_tb_comparator, veriloga
+
+`include "constants.vams"
+`include "disciplines.vams"
+
+//Test a comparator.
+//Find combination of noise and offset by applying a SAR binary search
+//to find the test voltage, (stimulus), which makes a known number of decisions flip.
+//When checking comparator noise, use a more advanced convergence with an equation system.
+//In the end, also apply a RAMP to do circuit debugging.
+
+module va_tb_comparator(VDD, VCM, VSS, CLK, RST, STIM, COMP, PWRMEASn);
+
+//Full scale relative to VSS
+input VDD;
+electrical VDD;
+//Reference for created stimulus
+input VCM;
+electrical VCM;
+//Reference for logic signals
+input VSS;
+electrical VSS;
+//With each clock, read comparator decision and apply new stimulus
+input CLK;
+electrical CLK;
+//Start test after Reset became false. Clock synchronous.
+input RST;
+electrical RST;
+//Stimulus to comparator
+output STIM;
+electrical STIM;
+//Decision from comparator
+input COMP;
+electrical COMP;
+//Is false during ramp and can window a power measurement block
+output PWRMEASn;
+electrical PWRMEASn;
+
+//Signal threshold for sensing binary input ports
+parameter real Threshold = 450m;
+//Rise and fall time of output signals.
+parameter real Trf = 200p;
+
+//Path to sncdfi_table.csv (see below)
+parameter SNCDFI_TABLE_PATH = "./sncdfi_table.csv";
+
+//Inverse normal density function as table model.
+//Directly offer conversion to real and divide two numbers,
+//because mostly two int numbers are divided by each other
+//Generate table with code below
+//Use odd number of points to include sncdfi(0.5) = 0.0 
+//import scipy as sp
+//import pathlib as pl
+//import numpy as np
+//NUM_POINTS = 10_0001
+//EBS = 1. / NUM_POINTS
+//outpath = pl.Path() / "sncdfi_table.csv"
+//xdat = np.linspace(start=EBS, stop=(1.-EBS), num=NUM_POINTS)
+//ydat = sp.special.ndtri(xdat)
+//combined = np.stack((xdat, ydat), axis=-1)
+//np.savetxt(outpath, combined)
+analog function real sncdfi;
+	input a;
+	real a;
+	input b;
+	real b;
+	begin
+		//Table has a single independent variable, which is linearly interpolated.
+		//Raise an error instead of extrapolating.
+		sncdfi = $table_model((a / b), SNCDFI_TABLE_PATH, "1E");
+	end
+endfunction
+
+//Add switches telling this block if noise or offset are included.
+//Simulation can then adaptively made faster
+//If neither noise nor offst are present, just the ramp is done.
+
+//If this switch is set, the stimulus knows that the simulated block has offset.
+//If there is no noise, a simple SAR conversion will estimate offset.
+//If there is noise, the offset will be estimated in full SAR/deterministic
+//convergence.
+parameter integer HAS_OFFSET = 1 from [0:1];
+
+//If this switch is set, the stimulus knows that the simulated block has noise.
+//The noise then is estimated and repeated comparator runs are used to gather noise statistics.
+parameter integer HAS_NOISE = 1 from [0:1];
+
+//Number of decisions per convergence iteration.
+//Paper calls this K
+//Default value for 90% statistical confidence c and for 10% relative error a.
+parameter integer DECISIONS_PER_ITER = 696 from (1:inf);
+
+//For how many iterations to proceed after number of flipped samples was correct
+parameter integer NUM_EXTRA_ITERS = 1 from [0:inf);
+
+//Maximum number of iterations to prevent simulation from hanging.
+//Instead of making this huge and spening many iterations in SAR conversion far away
+//from actual result, consider decreasing FIRST_VT_FACTOR.
+parameter integer MAX_ITERS = 30 from (0:inf);
+
+//Confidence range on samples. Paper calls this r
+//Default value for 90% statistical confidence c and for 10% relative error a.
+parameter integer CONFIDENCE_SAMPLE_RANGE = 16 from [0:inf);
+
+//Number of samples we expect to flip in an iteration. In paper, this is called M.
+//Default value for 90% statistical confidence c and for 10% relative error a.
+parameter integer EXPECTED_FLIP_NUMBER = 111 from (0:DECISIONS_PER_ITER);
+
+//We give sncdf(DISTRIBUTION_MOVE) as a constant, which is the
+//expected ratio of flipped samples. That way, we never need the sncdf function
+//and do not need to implement it
+parameter real EXPECTED_FLIP_RATIO = 0.15865525393145707 from (0:0.5);
+
+//Also state over which sigma the noise distribution is moved. Paper calls this m.
+parameter real DISTRIBUTION_MOVE = 1.0 from (0:inf);
+
+//Factor of full supply voltage over first stimulus used for first iteration
+//Stimulus is relative to VCM, so half the supply is maximum. Add another half because
+//we do not assume that noise and offset are that large.
+//If this number is too large, we spend much time in SAR iterations.
+//If it is too small, we are not able to detect large noise+offset, because
+//the first SAR iteration will be stuck with M = K/2. Deterministic convergence
+//will not launch (no noise information in decision counts), so SAR conversion
+//continues, reduces the stimulus even more and we are even more stuck without
+//information.
+//This scales starting amplitudes for the convergence.
+//parameter real FIRST_VT_FACTOR = 0.5 * 0.5 from (0:0.5];
+parameter real FIRST_VT_FACTOR = 1e-2 from (0:0.5];
+
+//If set, this will print debug messages
+parameter integer DEBUG = 1 from [0:1];
+
+//How many bits accuracy in offset detection. A SAR algorithm with that many iterations
+//finds the comparator offset. Set it larger than what you actually need,
+//because the SAR only takes minorly more time with that.
+//This is only needed, if you detect offset only. As soon as noise is enabled,
+//the stop criterion for the iteration is the sample confidence range.
+parameter integer OFFSET_DETECTION_BITS = 20 from (0:inf);
+
+//Boundaries and stepcount for the ramp.
+//Boundaries -1 and 1 are VSS and VDD respectively, if VCM is mid-supply.
+parameter real RAMP_LOWER_BOUND = -1.0 from [-1:1];
+parameter real RAMP_UPPER_BOUND =  1.0 from [-1:1];
+parameter integer RAMP_STEPS = 10 from (1:inf);
+
+//Delay as variables as needed by transition
+localparam dummydelay = 0;
+
+//The accuracy of the cross events in time. We use 1/100 of the Trf,
+//which is 2ps, which should be fine, because it then should be much more accurate than
+//clock period. We then deactivate the absolute expression tolerance to make
+//this one the important one.
+localparam real crosstolerance = 0.01 * Trf;
+
+//States during test: Do the convergence, test with ramp signal
+localparam integer TEST_STATE_IDLE = 0;
+localparam integer TEST_STATE_CONVERGENCE = 1;
+localparam integer TEST_STATE_RAMP   = 2;
+localparam integer TEST_STATE_DONE   = -1;
+
+//Effective number of simulated decisions per convergence iteration.
+//If there is no noise, a single decision is enough and there is no need to do statistics.
+localparam integer EFFECTIVE_DECISIONS_PER_ITER = (HAS_NOISE) ? DECISIONS_PER_ITER : 1;
+
+//Maximum and minimum number of samples we expect to flip. In plain offset-search
+//SAR convergence, this is just 0, meaning if one draws a single flip from a single
+//decisions, that is too much.
+//In confidence-boosted convergence, use M and r and limit the interval bounds between 0 and K.
+localparam integer EXPECTED_FLIP_NUMBER_MIN = (HAS_NOISE) ? max(0, EXPECTED_FLIP_NUMBER - CONFIDENCE_SAMPLE_RANGE) : 0;
+localparam integer EXPECTED_FLIP_NUMBER_MAX = (HAS_NOISE) ? min(EFFECTIVE_DECISIONS_PER_ITER, EXPECTED_FLIP_NUMBER + CONFIDENCE_SAMPLE_RANGE) : 0;
+
+//Number of flipped samples used as SAR threshold to find SAR direction.
+//This is the expected number of flips for noise finding and just 0
+//for finding just offset, as we have only a single decision per iteration there.
+localparam integer SAR_THRESHOLD = (HAS_NOISE) ? (EXPECTED_FLIP_NUMBER / 2) : 0;
+
+//If there is no noise and hence just the simple SAR conversion, there is no
+//deterministic convergence being able to set stimulus voltage larger than first stimulus.
+//In that case, we set the maximum value as first stimulus, otherwise the
+//simple offset--only SAR conversion cannot detect offset larger than this
+//small value.
+//The maximum value is documented around FIRST_VT_FACTOR.
+localparam real FIRST_VT_FACTOR_MAYBE_SAR = (HAS_NOISE) ? FIRST_VT_FACTOR : (0.5 * 0.5);
+
+//Memorize test state
+integer teststate = TEST_STATE_IDLE;
+
+//Output voltage relative to VCM
+real stimulus = 0;
+
+//Current index of how many decisions have been simulated in this iteration
+integer simulateddecisions = 0;
+
+//Number of flipped decisions counting up within an iteration
+integer flippeddecisions = 0;
+
+//The same number, bad held constant during next iteration. For debugging
+integer flippeddecisionsdebug = 0;
+
+//Number of already completed iterations, where number of flipped samples
+//was in-bound of the confidence interval
+integer doneiterations = 0;
+
+//Total number of all iterations
+integer totaliters = 0;
+
+//Is set, if convergence was successsfull within limited number of iterations
+//Convergence can be unsuccessfull, if the noise was extremely small and a noise
+//estimation had to stay in SAR conversion or if two points in iteration history
+//were the same in vt or finv.
+integer convergencegood = 0;
+
+//If set, the new stimulus is not computed from estimated mu0 and sigma0, but
+//was already set by some side condition.
+integer stimulusset = 0;
+
+//If set, the previous iteration did a SAR-based stimulus update.
+//Needed for stop criterion.
+integer previousiterdidsar = 0;
+
+//Is set, if an iteration has a number of flipped samples allowing deterministic convergence
+integer numberflippedsamplesok = 0;
+
+//Estimates for offset voltage and noise paramater in deterministic convergence
+real voestimate = 0;
+real sigmanestimate = 0;
+
+//Next applied SAR magnitude
+real sarmagnitude = 0;
+
+//History for vt, sncdfi and where histroy was already filled
+real historyvt[2:0] = {0, 0, 0};
+real historyfinv[2:0] = {0, 0, 0};
+integer historyvalid[2:0] = {0, 0, 0};
+
+//Final found value for combined noise and offset.
+//This is the output one would like to plot.
+real finalvt = 0;
+
+//Wether the power measurement blocks are activated. They are during the full ramp
+integer measurepower = 0;
+
+//Current index of ramp signal step
+integer donerampsteps = 0;
+
+//Number of bad ramp samples, where the comparator had a bad output
+integer badrampsamples = 0;
+
+//Function for printing debug messages.
+//Dummy return, which is later assigned to dummy variable to remove linter error.
+//Use strobe and not display, as display messages can vanish in short (offset-only) simulations.
+analog function integer debugMsg;
+	input msg;
+	input msgitercount;
+	string msg;
+	integer msgitercount;
+	begin
+		debugMsg = 0;
+		if(DEBUG) begin
+			$strobe(msg, "; Iteration", msgitercount);
+		end
+	end
+endfunction
+
+//Dummy return value
+integer dummyretval = 0;
+
+analog begin
+
+	@(initial_step) begin
+		//Solve linter issue due to unread variable
+		dummyretval = dummyretval;
+	end
+
+	//Conduct test on posedges. The comparator is not supposed to have its
+	//output already changed with this posedge.
+	//Use only the cross() time tolerance and disble the value tolerance.
+	@(cross(V(CLK, VSS) - Threshold, +1, crosstolerance, 1000)) begin
+		//During reset, which might come from external for circuitry,
+		//just do not conduct a test.
+		//it is later released clock-synchronous and the comparator then does a
+		//first decision before we arrive here.
+		if(V(RST, VSS) > Threshold) begin
+			teststate = TEST_STATE_IDLE;
+			stimulus = 0.0;
+
+			//Convergence
+			simulateddecisions = 0;
+			flippeddecisions = 0;
+			flippeddecisionsdebug = 0;
+			doneiterations = 0;
+			totaliters = 0;
+			convergencegood = 0;
+			stimulusset = 0;
+			previousiterdidsar = 0;
+			numberflippedsamplesok = 0;
+			voestimate = 0;
+			sigmanestimate = 0;
+			sarmagnitude = 0.0;
+			historyvt[0] = 0.0;
+			historyvt[1] = 0.0;
+			historyvt[2] = 0.0;
+			historyfinv[0] = 0.0;
+			historyfinv[1] = 0.0;
+			historyfinv[2] = 0.0;
+			historyvalid[0] = 0;
+			historyvalid[1] = 0;
+			historyvalid[2] = 0;
+			finalvt = 0;
+
+			//Ramp signal
+			measurepower = 0;
+			donerampsteps = 0;
+			badrampsamples = 0;
+		end
+		else begin
+			//Idle state preparing entrance into other states
+			if(teststate == TEST_STATE_IDLE) begin
+				if(HAS_NOISE || HAS_OFFSET) begin
+					teststate = TEST_STATE_CONVERGENCE;
+					if(HAS_NOISE) begin
+						//If there is noise and there will be classical convergence,
+						//Use non-zero starting test voltage, which is unlikely to get stuck
+						stimulus = V(VDD, VSS) * FIRST_VT_FACTOR_MAYBE_SAR;
+					end
+					else begin
+						//Otherwise, there is only offset and we start with no input voltage
+						stimulus = 0;
+					end
+					simulateddecisions = 0;
+					flippeddecisions = 0;
+					flippeddecisionsdebug = 0;
+					doneiterations = 0;
+					totaliters = 0;
+					convergencegood = 0;
+					stimulusset = 0;
+					previousiterdidsar = 0;
+					numberflippedsamplesok = 0;
+					voestimate = 0;
+					sigmanestimate = 0;
+					sarmagnitude = 0.0;
+					historyvt[0] = 0.0;
+					historyvt[1] = 0.0;
+					historyvt[2] = 0.0;
+					historyfinv[0] = 0.0;
+					historyfinv[1] = 0.0;
+					historyfinv[2] = 0.0;
+					historyvalid[0] = 0;
+					historyvalid[1] = 0;
+					historyvalid[2] = 0;
+					finalvt = 0;
+				end
+				else begin
+					stimulus = RAMP_LOWER_BOUND * V(VDD, VSS) / 2.0;
+					teststate=TEST_STATE_RAMP;
+					measurepower = 1;
+				end
+			end
+			//Do convergence to find noise or offset
+			if(teststate == TEST_STATE_CONVERGENCE) begin
+				//SImulate many decisions for one convergence iteration
+				simulateddecisions = simulateddecisions + 1;
+				//Count the ones which were flipped by noise.
+				//The paper regards 0 decisons as flipped
+				if(V(COMP, VSS) <= Threshold) begin
+					flippeddecisions = flippeddecisions + 1;
+				end
+				//If enough decisions have been simulated, iteration is done
+				if(simulateddecisions >= EFFECTIVE_DECISIONS_PER_ITER) begin
+					//Count number of done iterations
+					totaliters = totaliters + 1;
+					//Remember number of flipped decisions and keep constant during next iteration
+					flippeddecisionsdebug = flippeddecisions;
+					//Solve linter warning for unneeded var
+					flippeddecisionsdebug = flippeddecisionsdebug;
+					//Set flag, if the number of flipped samples is ok.
+					//This is the case, if any, but not all decisions flipped.
+					numberflippedsamplesok = ((flippeddecisions > 0) && (flippeddecisions < EFFECTIVE_DECISIONS_PER_ITER));
+					//The history holds items for deterministic convergence.
+					//Add items, if the current iteration contained noise information.
+					if(numberflippedsamplesok) begin
+						historyvt[2] = stimulus;
+						historyfinv[2] = sncdfi(flippeddecisions, EFFECTIVE_DECISIONS_PER_ITER);
+						historyvalid[2] = 1;
+					end
+					else begin
+						//Dummy
+						historyvt[2] = 0.0;
+						historyfinv[2] = 0.0;
+						historyvalid[2] = 0;
+					end
+					//If we have no noise or if the decisons have no information
+					//about position of noise distribution, fallback to SAR convergence.
+					//Also continue in SAR convergence if we previously did one and first have to fill history.
+					// || (previousiterdidsar && (!historyvalid[1]))
+					if((!numberflippedsamplesok) || (!HAS_NOISE) || (previousiterdidsar && (!historyvalid[1]))) begin
+						dummyretval = debugMsg("SAR convergence", totaliters);
+						//This is true, if we are in first SAR iteration.
+						//Set SAR magnitude to init value
+						if(sarmagnitude == 0.0) begin
+							//The first SAR step is not the same as the initial test signal, as that could
+							//get stuck in an osciallation between vt=0 and SAR convergence.
+							//We make it large enough to set a full-scale stimulus and make it able to compensate
+							//an already applied stimulus.
+							//We still relate it to the starting signal, as one can then use this as a central
+							//measure to state that it is known that noise+offset is small
+							sarmagnitude = (V(VDD, VSS) * FIRST_VT_FACTOR_MAYBE_SAR * 2.0) + abs(stimulus);
+						end
+						//Apply SAR magnitude with sign depending on
+						//number of flipped samples.
+						if(flippeddecisions <= SAR_THRESHOLD) begin
+							stimulus = stimulus - sarmagnitude;
+						end
+						else begin
+							stimulus = stimulus + sarmagnitude;
+						end
+						//Halven running SAR mangiutde
+						sarmagnitude = sarmagnitude / 2.0;
+						//If the following decisions are non-SAR convergence, they still
+						//cannot stop the convergence
+						previousiterdidsar = 1;
+						//If we do solely SAR convergence and no deterministic, the SAR convergence can even stop covergence process.
+						//Also stop here, if simulation takes too long due to some bug.
+						if(((!HAS_NOISE) && (totaliters >= OFFSET_DETECTION_BITS)) || (totaliters >= MAX_ITERS)) begin
+							//Convergence was only good, if we simulated without noise.
+							//A noise estimation should end with deterministic and not SAR convergence.
+							convergencegood = (!HAS_NOISE);
+							finalvt = stimulus;
+							stimulus = RAMP_LOWER_BOUND * V(VDD, VSS) / 2.0;
+							teststate=TEST_STATE_RAMP;
+							measurepower = 1;
+						end
+					end
+					//Deterministiic convergence
+					else begin
+						//If we later re-enter SAR convergence, something
+						//went really bad and we ask to re-set the SAR
+						//magnitude as a recovering measure.
+						sarmagnitude = 0;
+						//This will be set, if a folowing condition hard-sets
+						//the stimulus and if it cannot be computed from
+						//history.
+						stimulusset = 0;
+						//Mark number of iterations, where the number of flipped samples was in-bound.
+						//Only mark iterations, where deterministic convergence yielded the step.
+						if((flippeddecisions >= EXPECTED_FLIP_NUMBER_MIN) && (flippeddecisions <= EXPECTED_FLIP_NUMBER_MAX) && (!previousiterdidsar)) begin
+							doneiterations = doneiterations + 1;
+						end
+						
+						//If there were enough iterations now, transit to next test state
+						if((doneiterations > NUM_EXTRA_ITERS) || (totaliters >= MAX_ITERS)) begin
+							//Convergence was only good, if test ended because desired number of iterations had
+							//targeted number of flipped decisions. If we simply needed too many iters,
+							//we state that convergence did not succeed..
+							convergencegood = (doneiterations > NUM_EXTRA_ITERS);
+							finalvt = stimulus;
+							stimulus = RAMP_LOWER_BOUND * V(VDD, VSS) / 2.0;
+							teststate=TEST_STATE_RAMP;
+							measurepower = 1;
+							//Solve linter warning for unneeded var
+							convergencegood = convergencegood;
+							finalvt = finalvt;
+						end
+						//Otherwise, compute new stimulus
+						else begin
+							//If we have no history for some reason, apply a starting stimulus and mark
+							//that stimulus was computed.
+							//If only the second last history was set, we treat that as having no history.
+							if(!historyvalid[2]) begin
+								dummyretval = debugMsg("No history", totaliters);
+								stimulus = V(VDD, VSS) * FIRST_VT_FACTOR_MAYBE_SAR;
+								stimulusset = 1;
+							end
+
+							//Otherwise start by finding the estimated offset
+
+							//If this has no offset, we know the estimated mu0 exactly
+							//Skip offset estimation and possible divide by zero, if
+							//stimulus was already set and estimated offset will never be needed.
+							if((!HAS_OFFSET) || (stimulusset))begin
+								voestimate = 0;
+							end
+							//Otherwise, estimate it really
+							else begin
+								//If there is only a single valid history item
+								if(!historyvalid[1]) begin
+									//If vt2 is zero, we can get stuck in a zero loop with later formula.
+									//Instead, assign starting test voltage to break the loop.
+									//VerilogA here complains about not checking historyvt with a cross function,
+									//but this is a normal real variable.
+									if(historyvt[2] == 0.0) begin
+										dummyretval = debugMsg("Vt was zero", totaliters);
+										stimulus = V(VDD, VSS) * FIRST_VT_FACTOR_MAYBE_SAR;
+										stimulusset = 1;
+									end
+									//Otherwise, check if finv is 0. This means, that half the
+									//decisions flipped. In that case, the history is still marked
+									//as valid, as some and not all decisions filled.
+									//The sigma_n must just be huge compared to vt.
+									//We set stimulus to some large value.
+									else if(historyfinv[2] == 0.0) begin
+										dummyretval = debugMsg("Half the samples flipped", totaliters);
+										stimulus = 1.0 * V(VDD, VSS) * FIRST_VT_FACTOR_MAYBE_SAR;
+										stimulusset = 1;
+									end
+									//Otherwise, assmue that vo is very small, because we made it here
+									//without any SAR convergence filling the history.
+									//So our small start stimulus was large enough to move the distribution
+									//away from center (finv is not 0), but still not all or no decisions
+									//are flipped (history is valid). So the offset cannot dominate noise.
+									else begin
+										dummyretval = debugMsg("Vo assumed to be small", totaliters);
+										voestimate = 0.0;
+									end
+								end
+								//Otherwise, we have a full history
+								else begin
+									//If finv or vt did not change in history, keep its value.
+									//Otherwise we're getting numeric trobule.
+									//Wait for more iterations and their statistical variance to solve this issue.
+									if((historyvt[1] == historyvt[2]) || (historyfinv[1] == historyfinv[2])) begin
+										dummyretval = debugMsg("Bad history", totaliters);
+										stimulusset = 1;
+									end
+									//If we can use the history, use formula to estimate vo
+									else begin
+										dummyretval = debugMsg("Regular vo estimation", totaliters);
+										voestimate = (((-historyvt[1]) * (historyfinv[2] / historyfinv[1])) + historyvt[2]) * (historyfinv[1] / (historyfinv[2] - historyfinv[1]));
+									end
+								end
+							end
+
+							//estimate sigma_n and new stimulus now. If stimulus was still not hard set, we can run these formulas
+							if(!stimulusset) begin
+								sigmanestimate = ((-historyvt[2]) - voestimate) / historyfinv[2];
+								stimulus = (-(((-DISTRIBUTION_MOVE) * sigmanestimate) + voestimate));
+								stimulusset = 1;
+								
+							end
+						end
+						//Mark that we did a classical convergence
+						previousiterdidsar = 0;
+					end
+					//At the end of an iteration with many comp decisions, reset counters
+					simulateddecisions = 0;
+					flippeddecisions = 0;
+					//SHift history
+					historyvt[0] = historyvt[1];
+					historyvt[1] = historyvt[2];
+					historyfinv[0] = historyfinv[1];
+					historyfinv[1] = historyfinv[2];
+					historyvalid[0] = historyvalid[1];
+					historyvalid[1] = historyvalid[2];
+				end
+			end
+			//Ramp collection where a ramp shaped input is applied.
+			else if(teststate == TEST_STATE_RAMP) begin
+				donerampsteps = donerampsteps + 1;
+				//Check if comparator output is not the expected one and increase bad counter
+				badrampsamples = badrampsamples + ((stimulus > 0) && (V(COMP, VSS) <= Threshold));
+				badrampsamples = badrampsamples + ((stimulus < 0) && (V(COMP, VSS) > Threshold));
+				//We need this end condition to count the correct number of steps.
+				//donerampsteps counts from 0 to RAMP_STEPS-1 and when incrementing above to RAMP_STEPS, we directly end test case
+				if(donerampsteps >= RAMP_STEPS) begin
+					stimulus = 0;
+					teststate = TEST_STATE_DONE;
+				end
+				//Apply stimulus otherwise. The code above counts up to RAMP_STEPS-1, RAMP_STEPS already disables
+				//the condition here. That is why we have RAMP_STEPS-1 for norming the output signal.
+				else begin
+					stimulus = (RAMP_LOWER_BOUND + ((RAMP_UPPER_BOUND - RAMP_LOWER_BOUND) * donerampsteps / (RAMP_STEPS - 1))) * V(VDD, VSS) / 2.0;
+				end
+			end
+			//Default condition includes TEST_STATE_DONE and ends simulation and brings circuit to safe state.
+			//Keep internal variable values for plotting.
+			else begin
+				stimulus = 0;
+				measurepower = 0;
+				$finish_current_analysis(0);
+			end
+		end
+	end
+
+	//Assign outputs
+	V(PWRMEASn, VSS) <+ V(VDD, VSS) * (1 - transition(measurepower, dummydelay, Trf));
+	V(STIM, VCM) <+ transition(stimulus, dummydelay, Trf);
+
+end
+
+endmodule
