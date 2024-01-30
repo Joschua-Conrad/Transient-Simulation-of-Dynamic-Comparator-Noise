@@ -2,8 +2,6 @@
 This project includes a Verilog-A test block for measuring noise and offset of
 a comparator.
 
-[TOC]
-
 ## Information for Reviewers
 In case of acceptance of the provided manuscript, the code is made available
 publicly under an open-source license. Currently, it is solely provided
@@ -205,3 +203,10 @@ When using this, please cite the following work.
 
 }
 ```
+## ToDos for Publishing After Review
+
+- [ ] Update license
+- [ ] Add how-to-cite
+- [ ] Make repository public
+- [ ] Add affiliation
+- [ ] Add acknowledgment
