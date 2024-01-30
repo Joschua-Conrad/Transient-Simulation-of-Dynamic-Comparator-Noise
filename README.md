@@ -195,14 +195,6 @@ at these points.
 ## Tested Versions
 The block was tested with *Cadence Virtuoso IC6.1.8* and *Spectre 21.1.0*.
 
-## Cite
-When using this, please cite the following work.
-
-```bitlatex
-@inproceedings{
-
-}
-```
 ## ToDos for Publishing After Review
 
 - [ ] Update license
