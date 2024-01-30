@@ -3,9 +3,10 @@ This project includes a Verilog-A test block for measuring noise and offset of
 a comparator.
 
 ## Information for Reviewers
-In case of acceptance of the provided manuscript, the code is made available
+In case of acceptance of the provided manuscript, this repository is made available
 publicly under an open-source license. Currently, it is solely provided
 for the purpose of reviewing the manuscript at-hand. See [license](LICENSE.md).
+Due to the double-blind review process, no information about any author can be found.
 
 ## Test Procedure
 The test block can provide a test-voltage $v_{t}$ to the comparator,
