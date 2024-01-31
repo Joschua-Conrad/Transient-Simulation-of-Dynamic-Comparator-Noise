@@ -2,6 +2,10 @@
 This project includes a Verilog-A test block for measuring noise and offset of
 a comparator.
 
+![Test Block's Symbol](Symbol_Screenshot.png)
+
+![Exemplary Simulation Trace](VIVA_Screenshot.png)
+
 ## Information for Reviewers
 In case of acceptance of the provided manuscript, this repository is made available
 publicly under an open-source license. Currently, it is solely provided
