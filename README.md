@@ -211,6 +211,7 @@ Instead, this document provides all information to create the needed cells and c
 - [ ] Update license
 - [ ] Add how-to-cite
 - [ ] Make repository public
+- [ ] Update repository link in manuscript
 - [ ] Add affiliation
 - [ ] Add acknowledgment
 - [ ] Remove [Information for Reviewers](#information-for-reviewers)
