@@ -114,7 +114,7 @@ It is assumed, that *Cadence Virtuoso Analog Design Environment* is used.
 		   
 		   | Variable | Meaning  |
 		   | -------- | -------- |
-		   | finalvt | The final test voltage $v_{t}$, which is the sum of noise and offset. |
+		   | finalvt | The final test voltage $v_{t}$ after convergence, which is the noise amplitude standard deviation $\sigma_{n}$ minus the offset $v_{o}$. |
 		   | convergencegood | 1, if the algorithm convergence worked. |
 		   | flippeddecisionsdebug | How many decisions flipped during the last iteration. Over iterations, this approaches *M* and one can observe convergence here. |
 		   | totaliters | Total number of done iterations, where each one simulated *K* samples. |
@@ -200,6 +200,12 @@ at these points.
 ## Tested Versions
 The block was tested with *Cadence Virtuoso IC6.1.8* and *Spectre 21.1.0*.
 
+## Why no Maestro View, Symbol View, or Testbench Schematic is Provided
+In order to not violate any NDA regarding a PDK or Virtuoso itself, no binary files are provided,
+as only textual files can be screened for inclusion of sensitive information.
+Hence, no full cell or cellview is provided with the files uploaded here.
+Instead, this document provides all information to create the needed cells and cell-views.
+
 ## ToDos for Publishing After Review
 
 - [ ] Update license
@@ -207,3 +213,4 @@ The block was tested with *Cadence Virtuoso IC6.1.8* and *Spectre 21.1.0*.
 - [ ] Make repository public
 - [ ] Add affiliation
 - [ ] Add acknowledgment
+- [ ] Remove [Information for Reviewers](#information-for-reviewers)
