@@ -1,6 +1,11 @@
 # Transient Simulation of Dynamic-Comparator Noise
 This project includes a Verilog-A test block for measuring noise and offset of
 a comparator.
+Designed at the Institute of Microelectronics, Ulm University, Ulm, Germany
+by Joschua Conrad under the supervision of Prof. Maurits Ortmanns.
+Published at NEWCAS 2024.
+When using the code or concepts shown here for your own work, please cite
+the published paper as in [CITATION](CITATION.cff).
 
 ![Test Block's Symbol](Symbol_Screenshot.png)
 
@@ -209,9 +214,9 @@ Instead, this document provides all information to create the needed cells and c
 ## ToDos for Publishing After Review
 
 - [ ] Update license
-- [ ] Add how-to-cite
+- [X] Add how-to-cite
 - [ ] Make repository public
-- [ ] Update repository link in manuscript
-- [ ] Add affiliation
+- [X] Update repository link in manuscript
+- [X] Add affiliation
 - [ ] Add acknowledgment
 - [ ] Remove [Information for Reviewers](#information-for-reviewers)
