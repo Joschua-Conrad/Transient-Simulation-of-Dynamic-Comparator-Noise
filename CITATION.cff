@@ -32,34 +32,6 @@ authors:
     orcid: 'https://orcid.org/0000-0002-3547-1596'
 repository-code: >-
   https://github.com/Joschua-Conrad/Transient-Simulation-of-Dynamic-Comparator-Noise
-abstract: >-
-  While designing a comparator, simulation of input-referred
-  noise is crucial. While periodic steady state analyses
-  allow a fast simulation, they are cumbersome to set-up,
-  not compatible with all kinds of circuit models, and
-  require to know the noise-critical operating time within a
-  period. On the contrary, the comparator can be analyzed in
-  a noisy transient simulation with a small test-voltage
-  applied. The noise and offset characteristics can then be
-  derived from a number of simulated comparator decisions
-  and a statistical model. This method is easy to set-up,
-  but has two fundamental simulation parameters: the number
-  of simulated comparator decisions and the magnitude of the
-  applied test-voltage. In this work we derive the
-  statistical confidence into the estimated input-referred
-  noise and show how it depends on the two simulation
-  parameters. It is then shown that this confidence also
-  depends on the true (unknown) input-referred noise. To
-  solve that issue, an algorithm for boosting the
-  convergence is introduced. This algorithm iteratively
-  simulates the comparator decisions and updates the
-  test-voltage for granting a known confidence into the
-  estimated input-referred noise.
-keywords:
-  - Dynamic Comparator
-  - Transient Noise Analysis
-  - Simulation
-  - Confidence
 license: Apache-2.0
 preferred-citation:
   type: conference-paper
