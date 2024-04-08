@@ -64,8 +64,8 @@ license: Apache-2.0
 preferred-citation:
   type: conference-paper
   title: >-
-    Confidence Estimation and Boosting for Dynamic-Comparator
-    Transient-Noise Analysis
+    Confidence Estimation and Boosting for Dynamic-Comparator Transient-Noise
+    Analysis
   authors:
     - given-names: Joschua
       family-names: Conrad
@@ -88,28 +88,23 @@ preferred-citation:
       affiliation: Ulm University
       orcid: 'https://orcid.org/0000-0002-3547-1596'
   abstract: >-
-    While designing a comparator, simulation of input-referred
-    noise is crucial. While periodic steady state analyses
-    allow a fast simulation, they are cumbersome to set-up,
-    not compatible with all kinds of circuit models, and
-    require to know the noise-critical operating time within a
-    period. On the contrary, the comparator can be analyzed in
-    a noisy transient simulation with a small test-voltage
-    applied. The noise and offset characteristics can then be
-    derived from a number of simulated comparator decisions
-    and a statistical model. This method is easy to set-up,
-    but has two fundamental simulation parameters: the number
-    of simulated comparator decisions and the magnitude of the
-    applied test-voltage. In this work we derive the
-    statistical confidence into the estimated input-referred
-    noise and show how it depends on the two simulation
-    parameters. It is then shown that this confidence also
-    depends on the true (unknown) input-referred noise. To
-    solve that issue, an algorithm for boosting the
-    convergence is introduced. This algorithm iteratively
-    simulates the comparator decisions and updates the
-    test-voltage for granting a known confidence into the
-    estimated input-referred noise.
+    While designing a comparator, simulation of input-referred noise is crucial.
+    While periodic steady state analyses allow a fast simulation, they are
+    cumbersome to set-up, not compatible with all kinds of circuit models, and
+    require to know the noise-critical operating time within a period. On the
+    contrary, the comparator can be analyzed in a noisy transient simulation
+    with a small test-voltage applied. The noise and offset characteristics can
+    then be derived from a number of simulated comparator decisions and a
+    statistical model. This method is easy to set-up, but has two fundamental
+    simulation parameters: the number of simulated comparator decisions and the
+    magnitude of the applied test-voltage. In this work we derive the
+    statistical confidence into the estimated input-referred noise and show how
+    it depends on the two simulation parameters. It is then shown that this
+    confidence also depends on the true (unknown) input-referred noise. To solve
+    that issue, an algorithm for boosting the convergence is introduced. This
+    algorithm iteratively simulates the comparator decisions and updates the
+    test-voltage for granting a known confidence into the estimated
+    input-referred noise.
   keywords:
     - Dynamic Comparator
     - Transient Noise Analysis
@@ -119,7 +114,7 @@ preferred-citation:
     name: 2024 22nd IEEE International New Circuits and Systems Conference (NEWCAS)
     city: Sherbrooke
     country: CA
-    date-start: "2024-06-16"
-    date-end: "2024-06-19"
-  date-published: "2024-06-16"
+    date-start: '2024-06-16'
+    date-end: '2024-06-19'
+  date-published: '2024-06-16'
   year: 2024
