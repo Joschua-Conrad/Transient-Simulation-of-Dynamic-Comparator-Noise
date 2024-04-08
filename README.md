@@ -6,16 +6,11 @@ by Joschua Conrad under the supervision of Prof. Maurits Ortmanns.
 Published at NEWCAS 2024.
 When using the code or concepts shown here for your own work, please cite
 the published paper as in [CITATION](CITATION.cff).
+Also please acknowledge [LICENSE](LICENSE.md).
 
 ![Test Block's Symbol](Symbol_Screenshot.png)
 
 ![Exemplary Simulation Trace](VIVA_Screenshot.png)
-
-## Information for Reviewers
-In case of acceptance of the provided manuscript, this repository is made available
-publicly under an open-source license. Currently, it is solely provided
-for the purpose of reviewing the manuscript at-hand. See [license](LICENSE.md).
-Due to the double-blind review process, no information about any author can be found.
 
 ## Test Procedure
 The test block can provide a test-voltage $v_{t}$ to the comparator,
@@ -211,12 +206,5 @@ as only textual files can be screened for inclusion of sensitive information.
 Hence, no full cell or cellview is provided with the files uploaded here.
 Instead, this document provides all information to create the needed cells and cell-views.
 
-## ToDos for Publishing After Review
-
-- [ ] Update license
-- [X] Add how-to-cite
-- [ ] Make repository public
-- [X] Update repository link in manuscript
-- [X] Add affiliation
-- [ ] Add acknowledgment
-- [ ] Remove [Information for Reviewers](#information-for-reviewers)
+## Acknowledgment
+This work was funded by the *German National Science Foundation (DFG)* grant number *BE 7212/7-1 | OR 245/19-1.*
