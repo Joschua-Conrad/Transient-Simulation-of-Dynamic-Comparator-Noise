@@ -110,11 +110,12 @@ preferred-citation:
     - Transient Noise Analysis
     - Simulation
     - Confidence
+  date-published: 2024-06-16
+  year: 2024
   conference:
-    name: 2024 22nd IEEE International New Circuits and Systems Conference (NEWCAS)
+    name: '2024 22nd IEEE International New Circuits and Systems Conference (NEWCAS)'
     city: Sherbrooke
     country: CA
-    date-start: '2024-06-16'
-    date-end: '2024-06-19'
-  date-published: '2024-06-16'
-  year: 2024
+    date-start: 2024-06-16
+    date-end: 2024-06-19
+
