@@ -6,9 +6,19 @@ by Joschua Conrad under the supervision of Prof. Maurits Ortmanns.
 Published at NEWCAS 2024.
 When using the code or concepts shown here for your own work, please cite
 the published paper:
-```bibtex:CITATION.bib
 
+```bibtex
+@inproceedings{Conrad_Confidence_Boosting_2024,
+	author = {Conrad, Joschua and Kauffman, John and Wilherlmstätter, Simon and Asthana, Rohan and Belagiannis, Vasileios and Ortmanns, Maurits},
+	title = {Confidence Estimation and Boosting for Dynamic-Comparator Transient-Noise Analysis},
+	booktitle = {2024 22nd IEEE International New Circuits and Systems Conference {(NEWCAS)}},
+	date = {2024-06-16},
+	eventtitle = {2024 22nd IEEE International New Circuits and Systems Conference {(NEWCAS)}},
+	publisher = {IEEE},
+	location = {Sherbrooke, CA},
+}
 ```
+
 Also please acknowledge [LICENSE](LICENSE.md).
 
 ![Test Block's Symbol](Symbol_Screenshot.png)
