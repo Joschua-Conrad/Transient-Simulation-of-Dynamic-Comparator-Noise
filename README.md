@@ -5,7 +5,10 @@ Designed at the Institute of Microelectronics, Ulm University, Ulm, Germany
 by Joschua Conrad under the supervision of Prof. Maurits Ortmanns.
 Published at NEWCAS 2024.
 When using the code or concepts shown here for your own work, please cite
-the published paper as in [CITATION](CITATION.cff).
+the published paper:
+```bibtex:CITATION.bib
+
+```
 Also please acknowledge [LICENSE](LICENSE.md).
 
 ![Test Block's Symbol](Symbol_Screenshot.png)
