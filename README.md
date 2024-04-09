@@ -207,4 +207,4 @@ Hence, no full cell or cellview is provided with the files uploaded here.
 Instead, this document provides all information to create the needed cells and cell-views.
 
 ## Acknowledgment
-This work was funded by the *German National Science Foundation (DFG)* grant number *BE 7212/7-1 | OR 245/19-1.*
+This work was funded by the *German National Science Foundation (DFG)* under grant number *BE 7212/7-1 | OR 245/19-1*.
