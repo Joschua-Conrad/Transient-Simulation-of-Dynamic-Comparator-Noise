@@ -28,7 +28,7 @@ Also please acknowledge [LICENSE](LICENSE.md).
 ## Test Procedure
 The test block can provide a test-voltage $v_{t}$ to the comparator,
 simulate a number of decisions and read its output.
-The following compaarator properties can be found:
+The following comparator properties can be found:
 
 - Plain comparator offset without any noise by utilizing a binary search (BS)
   algoithm. This needs only about 20 decisions and simulates very fast.
@@ -44,7 +44,7 @@ The following compaarator properties can be found:
   deterministic convergence is then even faster, as it does not need to predict
   offset from simulation history.
   
-- Lastly, the test block provides an input ramp with knwon bounds around the
+- Lastly, the test block provides an input ramp with known bounds around the
   comparator's trip-point. This is handy for anaylzing e.g. metastability.
   
 The following table lists the simulation procedure depending on whether the
