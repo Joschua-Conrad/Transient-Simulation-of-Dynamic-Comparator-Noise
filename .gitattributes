@@ -1,1 +1,5 @@
+#The sncdfi table does not change single lines. It is basically binary.
 *.csv binary
+#Tell syntax highlighter to treat .va files as verilog
+#https://webapps.stackexchange.com/questions/31654/force-github-syntax-highlighting-language-on-source-files
+*.va linguist-language=Verilog
